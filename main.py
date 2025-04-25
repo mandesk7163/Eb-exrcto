@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 load_dotenv()
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
-# Webserver para manter o bot online no Render
+# Webserver para manter o bot ativo no Render
 app = Flask(__name__)
 
 @app.route('/')
@@ -23,7 +23,7 @@ def home():
 def run_web():
     app.run(host="0.0.0.0", port=8080)
 
-# Discord e IA
+# Discord + IA
 intents = discord.Intents.default()
 intents.messages = True
 intents.message_content = True
@@ -35,6 +35,7 @@ tags = ["gore", "nudity", "violence", "blood", "weapon", "porn", "gun", "knife",
 text_inputs = torch.cat([clip.tokenize(f"a photo of {t}") for t in tags]).to(device)
 bad_words = ['puto', 'puta', 'caralho', 'fdp', 'desgraça', 'merda', 'buceta', 'viado']
 
+# Função de análise de imagem
 async def analyze_image_url(url):
     response = requests.get(url)
     image = Image.open(io.BytesIO(response.content)).convert("RGB")
@@ -56,22 +57,27 @@ async def on_message(message):
     if message.author == bot.user:
         return
 
+    # Detectar palavrões
     if any(word in message.content.lower() for word in bad_words):
         await message.delete()
-        await message.channel.send(f"[MOD-IA] Linguagem ofensiva detectada de {message.author.mention}")
+        try:
+            await message.author.send("**[MOD-IA]** Você não pode enviar mensagens com palavras ofensivas nesse servidor.")
+        except:
+            pass
 
+    # Detectar imagens/vídeos
     for attachment in message.attachments:
         if any(attachment.filename.lower().endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".gif", ".mp4"]):
             detections = await analyze_image_url(attachment.url)
             if detections:
                 await message.delete()
-                alert = f"**[ALERTA] Conteúdo suspeito detectado de {message.author.mention}:**
-"
-                for k, v in detections.items():
-                    alert += f"- `{k}`: {round(v * 100, 2)}%
-"
-                await message.channel.send(alert)
+                try:
+                    await message.author.send("**[MOD-IA]** Você não pode enviar imagens ou vídeos inapropriados nesse servidor.")
+                except:
+                    pass
 
+# Start
 if __name__ == "__main__":
     Thread(target=run_web).start()
     bot.run(TOKEN)
+    
